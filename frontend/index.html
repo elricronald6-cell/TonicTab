@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TonicTab — prepaid vouchers on BOT Chain</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.9.0/ethers.umd.min.js"></script>
+<style>
+/* ============================================================================
+   FRUTIGER AERO — glossy 3D, liquid glass, bright daylight gradients.
+   Top nav + centred hero + horizontally scrolling shelves. Nothing is a
+   bordered card; everything is a bubble with a specular highlight.
+   ========================================================================== */
+:root{
+  --sky-1:#bfe9ff;
+  --sky-2:#7fd0f5;
+  --aqua:#19a7e0;
+  --aqua-dk:#0b74a8;
+  --leaf:#5ed06a;
+  --leaf-dk:#2f9a46;
+  --ink:#0c3346;
+  --ink-soft:#4a7389;
+  --white:#ffffff;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  min-height:100vh;color:var(--ink);
+  font-family:'Lato',system-ui,sans-serif;font-size:16px;line-height:1.6;
+  background:
+    radial-gradient(ellipse 120% 70% at 50% 0%, #eafaff 0%, var(--sky-1) 38%, var(--sky-2) 72%, #3fb0dd 100%),
+    #7fd0f5;
+  background-attachment:fixed;
+}
+/* light bloom + a horizon of water */
+body::after{
+  content:"";position:fixed;left:0;right:0;bottom:0;height:34vh;pointer-events:none;z-index:0;
+  background:linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.34) 44%, rgba(94,208,106,.42) 100%);
+  filter:blur(.3px);
+}
+.page{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:0 22px 70px}
+h1,h2,h3,.q{font-family:'Quicksand',sans-serif;font-weight:700;margin:0}
+
+/* ---------- glossy chrome ---------- */
+.gloss{position:relative;overflow:hidden}
+.gloss::before{
+  content:"";position:absolute;left:0;right:0;top:0;height:48%;pointer-events:none;
+  background:linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,.08));
+  border-radius:inherit;
+}
+
+/* ---------- top nav ---------- */
+nav{
+  position:sticky;top:0;z-index:20;margin:14px 0 0;padding:10px 18px;border-radius:999px;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  background:linear-gradient(180deg, rgba(255,255,255,.92), rgba(224,246,255,.72));
+  box-shadow:0 10px 26px rgba(11,76,112,.26), inset 0 1px 0 rgba(255,255,255,.95);
+  backdrop-filter:blur(9px);
+}
+nav .logo{display:flex;align-items:center;gap:10px;margin-right:auto}
+nav .orb{width:34px;height:34px;border-radius:50%;
+  background:radial-gradient(circle at 32% 26%, #ffffff 0 12%, #8be3ff 38%, #19a7e0 72%, #0b5f8c 100%);
+  box-shadow:0 3px 8px rgba(11,76,112,.4), inset 0 -3px 6px rgba(0,0,0,.2)}
+nav .logo b{font-family:'Quicksand';font-weight:700;font-size:21px;letter-spacing:-.01em}
+nav .pill{font-family:'Quicksand';font-weight:600;font-size:12.5px;padding:6px 13px;border-radius:999px;
+  background:rgba(255,255,255,.72);box-shadow:inset 0 1px 0 #fff, 0 2px 5px rgba(11,76,112,.16);color:var(--ink-soft)}
+nav .pill.ok{background:linear-gradient(180deg,#9bf0a7,#56c468);color:#0f3d1c}
+nav .pill.warn{background:linear-gradient(180deg,#ffd27a,#f0a62c);color:#4a2f00}
+
+/* ---------- aqua buttons ---------- */
+button{
+  font-family:'Quicksand';font-weight:700;font-size:14px;cursor:pointer;border:none;color:#fff;
+  padding:11px 22px;border-radius:999px;
+  background:linear-gradient(180deg,#5ec8f3,var(--aqua) 52%,var(--aqua-dk));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), inset 0 -7px 12px rgba(0,0,0,.14),
+             0 6px 14px rgba(11,76,112,.34);
+  transition:.14s;
+}
+button:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+button:active:not(:disabled){transform:translateY(1px);filter:brightness(.96)}
+button:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+button.leafy{background:linear-gradient(180deg,#8ce89a,var(--leaf) 52%,var(--leaf-dk));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9), 0 6px 14px rgba(20,90,40,.3)}
+button.ghost{background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(214,240,252,.8));color:var(--aqua-dk);
+  box-shadow:inset 0 1px 0 #fff, 0 3px 9px rgba(11,76,112,.2)}
+button.sm{font-size:12.5px;padding:8px 15px}
+
+/* ---------- hero ---------- */
+.hero{text-align:center;padding:46px 0 26px;position:relative}
+.hero h1{font-size:clamp(46px,8vw,86px);line-height:1.02;letter-spacing:-.02em;
+  color:#063c58;text-shadow:0 2px 0 rgba(255,255,255,.75), 0 10px 26px rgba(8,70,104,.28)}
+.hero p{max-width:60ch;margin:14px auto 0;font-size:19px;color:#0e4a66}
+.bigorb{width:152px;height:152px;border-radius:50%;margin:0 auto 18px;position:relative;
+  background:radial-gradient(circle at 32% 24%, #ffffff 0 10%, #bdf0ff 26%, #3fb8e8 58%, #0a6a9c 100%);
+  box-shadow:0 22px 44px rgba(8,70,104,.4), inset 0 -16px 26px rgba(0,0,0,.26),
+             inset 0 10px 18px rgba(255,255,255,.55)}
+.bigorb::after{content:"";position:absolute;left:19%;top:12%;width:40%;height:26%;border-radius:50%;
+  background:linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,0));filter:blur(1px)}
+.bigorb span{position:absolute;inset:0;display:grid;place-items:center;font-family:'Quicksand';
+  font-weight:700;font-size:40px;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.35)}
+
+/* ---------- counter bubbles in a scrolling shelf ---------- */
+.shelfhead{display:flex;align-items:baseline;gap:14px;margin:34px 0 14px}
+.shelfhead h2{font-size:25px;color:#073f5c}
+.shelfhead span{font-size:14px;color:#2b6a89}
+.shelf{display:flex;gap:20px;overflow-x:auto;padding:8px 4px 22px;scroll-snap-type:x mandatory}
+.shelf::-webkit-scrollbar{height:10px}
+.shelf::-webkit-scrollbar-thumb{background:rgba(255,255,255,.75);border-radius:999px}
+.shelf::-webkit-scrollbar-track{background:rgba(255,255,255,.3);border-radius:999px}
+
+.bubble{
+  flex:0 0 272px;scroll-snap-align:start;border-radius:28px;padding:24px 22px 20px;text-align:center;
+  background:linear-gradient(180deg, rgba(255,255,255,.96), rgba(222,245,255,.86));
+  box-shadow:inset 0 2px 0 rgba(255,255,255,1), 0 14px 30px rgba(10,74,110,.3);
+  position:relative;overflow:hidden;
+}
+.bubble::before{content:"";position:absolute;left:8%;right:8%;top:5px;height:38%;border-radius:999px;
+  background:linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,255,255,0));pointer-events:none}
+.bubble.shut{filter:saturate(.45) brightness(.98)}
+.bubble h3{font-size:20px;line-height:1.2;color:#07394f}
+.bubble .who{font-size:12px;color:var(--ink-soft);margin-top:3px}
+.bubble .amount{font-family:'Quicksand';font-weight:700;font-size:40px;line-height:1.1;margin-top:12px;
+  color:var(--aqua-dk);text-shadow:0 1px 0 #fff}
+.bubble .amount small{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);letter-spacing:.08em}
+.bubble .stats{font-size:12px;color:var(--ink-soft);margin-top:10px}
+.bubble .acts{margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+
+/* ---------- my vouchers: glass slips ---------- */
+.slip{
+  flex:0 0 300px;scroll-snap-align:start;border-radius:22px;padding:18px 20px;
+  background:linear-gradient(145deg, rgba(255,255,255,.72), rgba(170,224,248,.52));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.95), 0 12px 26px rgba(10,74,110,.26);
+  backdrop-filter:blur(7px);border:1px solid rgba(255,255,255,.6);position:relative;
+}
+.slip.spent{opacity:.62}
+.slip .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.slip .tagline{font-family:'Quicksand';font-weight:700;font-size:11px;letter-spacing:.1em;
+  padding:4px 10px;border-radius:999px;background:linear-gradient(180deg,#9bf0a7,#56c468);color:#0f3d1c}
+.slip .tagline.exp{background:linear-gradient(180deg,#ffd27a,#f0a62c);color:#4a2f00}
+.slip h4{font-size:18px;margin:10px 0 2px;color:#07394f}
+.slip .meta{font-size:12px;color:var(--ink-soft)}
+.slip .face{font-family:'Quicksand';font-weight:700;font-size:30px;color:var(--aqua-dk);margin-top:10px}
+.slip .acts{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
+
+/* ---------- open-a-counter form, as a floating island ---------- */
+.island{
+  margin-top:40px;border-radius:30px;padding:30px 34px;
+  background:linear-gradient(180deg, rgba(255,255,255,.94), rgba(214,242,254,.84));
+  box-shadow:inset 0 2px 0 #fff, 0 18px 40px rgba(10,74,110,.3);
+  display:grid;grid-template-columns:1.1fr 1fr;gap:34px;
+}
+@media(max-width:860px){.island{grid-template-columns:1fr}}
+.island h2{font-size:26px;color:#073f5c;margin-bottom:6px}
+.island p{color:#2b6a89;font-size:15px;margin:0 0 6px}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:10px}
+@media(max-width:560px){.fields{grid-template-columns:1fr}}
+label{display:block;font-family:'Quicksand';font-weight:700;font-size:12px;color:#2b6a89;margin-bottom:6px}
+input,select{width:100%;padding:12px 15px;border-radius:999px;border:1px solid rgba(255,255,255,.9);
+  background:rgba(255,255,255,.88);color:var(--ink);font-family:'Lato',sans-serif;font-size:15px;
+  box-shadow:inset 0 2px 5px rgba(10,74,110,.14)}
+input:focus,select:focus{outline:3px solid rgba(25,167,224,.4);outline-offset:1px}
+.rules{font-size:14.5px;color:#0e4a66;line-height:1.75}
+.rules b{font-family:'Quicksand';color:#073f5c}
+
+.nothing{border-radius:24px;padding:38px;text-align:center;color:#2b6a89;
+  background:rgba(255,255,255,.55);box-shadow:inset 0 1px 0 #fff}
+
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(180%);
+  padding:13px 24px;border-radius:999px;font-family:'Quicksand';font-weight:700;font-size:14px;color:#fff;
+  background:linear-gradient(180deg,#5ec8f3,#0b74a8);
+  box-shadow:0 14px 30px rgba(8,70,104,.45), inset 0 1px 0 rgba(255,255,255,.8);
+  max-width:88vw;transition:transform .26s;z-index:60}
+#toast.show{transform:translateX(-50%) translateY(0)}
+#toast.bad{background:linear-gradient(180deg,#ff9a6e,#d9472a)}
+
+footer{margin-top:40px;text-align:center;font-family:'Quicksand';font-weight:600;font-size:12.5px;
+  color:#1d5b7a;opacity:.85}
+
+/* ===== BOT Chain ecosystem footer (KPI 5) ===== */
+footer.bc-foot{display:block;position:relative;z-index:1;max-width:1200px;margin:40px auto 0;
+  text-align:left;opacity:1;
+  border-radius:28px;overflow:hidden;
+  background:linear-gradient(180deg, rgba(255,255,255,.94), rgba(214,242,254,.82));
+  box-shadow:inset 0 2px 0 #fff, 0 16px 34px rgba(10,74,110,.3)}
+.bc-foot-grid{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:20px;
+  padding:20px 26px;border-bottom:1px solid rgba(11,76,112,.14)}
+@media(max-width:720px){.bc-foot-grid{grid-template-columns:1fr;gap:14px}}
+.bc-foot .bc-logo{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;
+  background:radial-gradient(circle at 32% 26%, #ffffff 0 14%, #d8f3ff 40%, #8fd8f3 74%, #2f9cc9 100%);
+  box-shadow:0 5px 12px rgba(11,76,112,.34), inset 0 -4px 8px rgba(0,0,0,.14)}
+.bc-foot .bc-id{font-family:'Quicksand',sans-serif;font-weight:700;font-size:19px;color:#07394f}
+.bc-foot .bc-id small{display:block;font-weight:600;font-size:10px;letter-spacing:.18em;
+  text-transform:uppercase;color:#2b6a89;margin-top:2px}
+.bc-foot .bc-links{display:flex;gap:10px;flex-wrap:wrap}
+.bc-foot .bc-links a{font-family:'Quicksand',sans-serif;font-weight:700;font-size:12.5px;
+  letter-spacing:.06em;text-transform:uppercase;color:#fff;text-decoration:none;
+  padding:9px 18px;border-radius:999px;
+  background:linear-gradient(180deg,#5ec8f3,#19a7e0 52%,#0b74a8);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.85), 0 5px 12px rgba(11,76,112,.3)}
+.bc-foot .bc-links a:hover{filter:brightness(1.08)}
+.bc-foot .bc-meta{font-family:'Quicksand',sans-serif;font-weight:600;font-size:11px;
+  letter-spacing:.12em;text-transform:uppercase;color:#2b6a89;padding:12px 26px;
+  display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.bc-foot .bc-meta b{color:#07394f;font-weight:700}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <nav class="gloss">
+    <div class="logo"><div class="orb"></div><b>TonicTab</b></div>
+    <span class="pill" id="p-net">network</span>
+    <span class="pill" id="p-ctr">contract</span>
+    <span class="pill" id="p-acct">not connected</span>
+    <button class="ghost sm" id="btn-refresh">Refresh</button>
+    <button id="btn-connect">Connect</button>
+  </nav>
+
+  <header class="hero">
+    <div class="bigorb"><span id="orb-val">—</span></div>
+    <h1>Prepaid, and still yours</h1>
+    <p>Vouchers sit in escrow until somebody actually spends them. Only the holder can redeem — and anything left unspent past expiry comes back to you in full.</p>
+  </header>
+
+  <div class="shelfhead"><h2>Counters</h2><span id="c-note">buy a voucher at its face value</span></div>
+  <div class="shelf" id="shelf"><div class="nothing">Nothing on the shelf yet.</div></div>
+
+  <div class="shelfhead"><h2>Your vouchers</h2><span id="v-note">spend, pass on, or reclaim after expiry</span></div>
+  <div class="shelf" id="wallet"><div class="nothing">Connect to see what you hold.</div></div>
+
+  <section class="island">
+    <div>
+      <h2>Open a counter</h2>
+      <p>You become the merchant. Set a face value and a validity window; reprice later if you like — vouchers already sold keep the value they were bought at.</p>
+      <div class="fields">
+        <div style="grid-column:1/-1">
+          <label for="f-name">Counter name</label>
+          <input id="f-name" maxlength="48" placeholder="Harbour Lane Coffee" />
+        </div>
+        <div>
+          <label for="f-denom">Face value (BOT)</label>
+          <input id="f-denom" type="number" min="0.001" step="0.001" value="0.5" />
+        </div>
+        <div>
+          <label for="f-validity">Valid for</label>
+          <select id="f-validity">
+            <option value="604800">1 week</option>
+            <option value="2592000" selected>30 days</option>
+            <option value="7776000">90 days</option>
+            <option value="15552000">180 days</option>
+            <option value="31536000">1 year</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:20px"><button class="leafy" id="btn-open-counter">Open the counter</button></div>
+    </div>
+    <div class="rules">
+      <b>What a merchant can't do</b><br />
+      Pull funds early — redemption is the holder's call, so until a customer spends, the BOT isn't yours.<br /><br />
+      Keep breakage — an expired voucher refunds to its holder in full, with no fee taken.<br /><br />
+      Block a transfer — holders pass vouchers on without asking.<br /><br />
+      <b>What a merchant can do</b><br />
+      Stop selling at any time, and reprice for future buyers.
+    </div>
+  </section>
+
+  <footer id="f-chain">BOT Chain</footer>
+</div>
+
+
+<!-- ===== BOT Chain ecosystem footer (KPI 5) ===== -->
+<footer class="bc-foot">
+  <div class="bc-foot-grid">
+    <div class="bc-logo" aria-hidden="true"><svg viewBox="0 0 63.63 100" xmlns="http://www.w3.org/2000/svg" style="width:20px;height:32px;display:block"><path fill="#00A67E" d="M31.67 99.95 L0 82.48 L0.11 63.74 L47.01 90.60 L47.01 73.19 L15.98 55.32 L15.95 36.49 L46.92 53.57 L47.39 36.82 L15.96 17.81 L16.26 0 L63.06 27.02 L62.82 46.20 L47.86 54.67 L62.85 63.00 L63.62 81.42 Z"/></svg></div>
+    <div class="bc-id">BOT Chain<small>Part of the ecosystem</small></div>
+    <div class="bc-links">
+      <a href="https://botchain.ai" target="_blank" rel="noopener noreferrer">botchain.ai</a>
+      <a id="bc-explorer" href="https://scan.botchain.ai" target="_blank" rel="noopener noreferrer">Explorer</a>
+    </div>
+  </div>
+  <div class="bc-meta">
+    <span>&copy; 2026 <b>BOT Chain</b> &mdash; EVM-compatible Layer 1</span>
+  </div>
+</footer>
+
+<div id="toast"></div>
+
+<script>
+/* ============================================================================
+   CONTRACT + NETWORK CONFIG
+
+   Paste the deployed address below. Defaults to BOT Chain TESTNET.
+
+   TESTNET -> MAINNET: swap these five values together, never some of them.
+     CONTRACT_ADDRESS  -> the mainnet address
+     chainId           -> "0x2A5"
+     chainName         -> "BOT Chain"
+     rpcUrls           -> ["https://rpc.botchain.ai"]
+     blockExplorerUrls -> ["https://scan.botchain.ai"]
+   ...and set label -> "MAINNET" so the badge reads correctly.
+   ========================================================================== */
+const CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+const NETWORK = {
+  chainId: "0x3C8",                              // 968 testnet  | mainnet: "0x2A5"
+  chainIdDec: 968,                               // reference only, not shown on the page | mainnet: 677
+  chainName: "BOT Chain Testnet",                //              | mainnet: "BOT Chain"
+  rpcUrls: ["https://rpc.bohr.life"],            //              | mainnet: ["https://rpc.botchain.ai"]
+  blockExplorerUrls: ["https://scan.bohr.life"], //              | mainnet: ["https://scan.botchain.ai"]
+  nativeCurrency: { name: "BOT", symbol: "BOT", decimals: 18 },
+  label: "TESTNET"                               //              | mainnet: "MAINNET"
+};
+
+const ABI = [
+  "function openCounter(string name, uint256 denomination, uint64 validitySecs) returns (uint256)",
+  "function setSelling(uint256 counterId, bool selling)",
+  "function updateDenomination(uint256 counterId, uint256 denomination)",
+  "function buyVoucher(uint256 counterId, string memo) payable returns (uint256)",
+  "function transferVoucher(uint256 voucherId, address to)",
+  "function redeemVoucher(uint256 voucherId)",
+  "function refundExpired(uint256 voucherId)",
+  "function counterCount() view returns (uint256)",
+  "function voucherCount() view returns (uint256)",
+  "function getCounter(uint256 id) view returns (tuple(address merchant,uint256 denomination,uint64 validitySecs,bool selling,uint32 sold,uint32 redeemed,uint32 refunded,string name))",
+  "function getVoucher(uint256 id) view returns (tuple(uint64 counterId,address holder,uint64 boughtAt,uint64 expiresAt,uint256 value,uint8 status,string memo))",
+  "function getVouchersByHolder(address holder) view returns (uint256[])",
+  "function getRecentCounters(uint256 limit) view returns (uint256[])",
+  "function escrowedTotal() view returns (uint256)",
+  "function feeBps() view returns (uint16)"
+];
+
+const ZERO = "0x0000000000000000000000000000000000000000";
+const $ = (id) => document.getElementById(id);
+let provider, signer, account, contract, readContract;
+let counters = [], mine = [];
+
+function toast(msg, bad) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = "show" + (bad ? " bad" : "");
+  clearTimeout(t._h);
+  t._h = setTimeout(() => (t.className = ""), 4200);
+}
+const short = (a) => a.slice(0, 6) + "…" + a.slice(-4);
+const fmt = (wei) => {
+  const n = Number(ethers.formatEther(wei));
+  return (n >= 1 ? n.toFixed(3) : n.toFixed(4)).replace(/0+$/, "").replace(/\.$/, "");
+};
+function esc(s) {
+  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+function reason(e) {
+  const m = (e && (e.shortMessage || e.reason || e.message)) || "Transaction failed";
+  return String(m).replace(/^execution reverted:?\s*/i, "").slice(0, 150);
+}
+function human(secs) {
+  const d = Math.floor(secs / 86400);
+  if (d >= 1) return d + (d === 1 ? " day" : " days");
+  const h = Math.floor(secs / 3600);
+  if (h >= 1) return h + "h";
+  return Math.max(0, Math.floor(secs / 60)) + "m";
+}
+const when = (ts) => new Date(ts * 1000).toISOString().slice(0, 10);
+
+/* ---------------------------------------------------------------- wallet */
+function readOnly() {
+  try {
+    const p = new ethers.JsonRpcProvider(NETWORK.rpcUrls[0]);
+    readContract = new ethers.Contract(CONTRACT_ADDRESS, ABI, p);
+  } catch (e) { /* no read-only view */ }
+}
+async function connect() {
+  if (!window.ethereum) { toast("No wallet found. Install MetaMask.", true); return; }
+  try {
+    provider = new ethers.BrowserProvider(window.ethereum);
+    await provider.send("eth_requestAccounts", []);
+    await ensureChain();
+    signer = await provider.getSigner();
+    account = await signer.getAddress();
+    contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+    $("p-acct").textContent = short(account);
+    $("p-acct").className = "pill ok";
+    $("btn-connect").textContent = "Connected";
+    await load();
+  } catch (e) { toast(reason(e), true); }
+}
+async function ensureChain() {
+  const current = await window.ethereum.request({ method: "eth_chainId" });
+  if (current.toLowerCase() === NETWORK.chainId.toLowerCase()) return;
+  try {
+    await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: NETWORK.chainId }] });
+  } catch (err) {
+    if (err.code === 4902) {
+      await window.ethereum.request({
+        method: "wallet_addEthereumChain",
+        params: [{
+          chainId: NETWORK.chainId, chainName: NETWORK.chainName, rpcUrls: NETWORK.rpcUrls,
+          blockExplorerUrls: NETWORK.blockExplorerUrls, nativeCurrency: NETWORK.nativeCurrency
+        }]
+      });
+    } else throw err;
+  }
+}
+
+/* ------------------------------------------------------------------ load */
+async function load() {
+  const c = contract || readContract;
+  if (!c || CONTRACT_ADDRESS === ZERO) { renderShelf(); renderWallet(); return; }
+  try {
+    const [cc, vc, held, fee] = await Promise.all([
+      c.counterCount(), c.voucherCount(), c.escrowedTotal(), c.feeBps()
+    ]);
+    $("orb-val").textContent = fmt(held);
+    $("c-note").textContent = cc + " counters · " + vc + " vouchers · " + (Number(fee) / 100) + "% on redemption";
+
+    const ids = await c.getRecentCounters(24n);
+    counters = [];
+    for (const id of ids) counters.push({ id, c: await c.getCounter(id) });
+    renderShelf();
+
+    mine = [];
+    if (account) {
+      const vids = await c.getVouchersByHolder(account);
+      for (const id of vids) {
+        const v = await c.getVoucher(id);
+        mine.push({ id, v, counter: await c.getCounter(v.counterId) });
+      }
+    }
+    renderWallet();
+  } catch (e) {
+    toast("Could not read the contract. Check the address and network.", true);
+  }
+}
+
+/* ---------------------------------------------------------------- render */
+function renderShelf() {
+  const el = $("shelf");
+  if (CONTRACT_ADDRESS === ZERO) {
+    el.innerHTML = '<div class="nothing">No contract address set yet. Deploy TonicTab, then paste the address into <code>CONTRACT_ADDRESS</code> in this file.</div>';
+    return;
+  }
+  if (!counters.length) { el.innerHTML = '<div class="nothing">Nothing on the shelf yet.</div>'; return; }
+  el.innerHTML = counters.map(({ id, c }) => {
+    const isMine = account && c.merchant.toLowerCase() === account.toLowerCase();
+    return '<article class="bubble gloss ' + (c.selling ? "" : "shut") + '">' +
+      '<h3>' + esc(c.name) + '</h3>' +
+      '<div class="who">' + short(c.merchant) + (c.selling ? "" : " · paused") + '</div>' +
+      '<div class="amount">' + fmt(c.denomination) + '<small>BOT PER VOUCHER</small></div>' +
+      '<div class="stats">good for ' + human(Number(c.validitySecs)) + ' · ' +
+        c.sold + ' sold · ' + c.redeemed + ' spent · ' + c.refunded + ' refunded</div>' +
+      '<div class="acts">' +
+        (c.selling ? '<button class="sm" data-buy="' + id + '" data-price="' + c.denomination + '">Buy one</button>' : '') +
+        (isMine ? '<button class="ghost sm" data-sell="' + id + '" data-to="' + (c.selling ? "0" : "1") + '">' +
+          (c.selling ? "Pause" : "Resume") + '</button>' : '') +
+      '</div>' +
+    '</article>';
+  }).join("");
+}
+
+function renderWallet() {
+  const el = $("wallet");
+  if (!account) { el.innerHTML = '<div class="nothing">Connect to see what you hold.</div>'; return; }
+  if (!mine.length) { el.innerHTML = '<div class="nothing">No vouchers yet — pick one off the shelf.</div>'; return; }
+  const now = Math.floor(Date.now() / 1000);
+  el.innerHTML = mine.map(({ id, v, counter }) => {
+    const expired = now >= Number(v.expiresAt);
+    return '<article class="slip ' + (expired ? "spent" : "") + '">' +
+      '<div class="top"><span class="meta">#' + id + '</span>' +
+        '<span class="tagline ' + (expired ? "exp" : "") + '">' + (expired ? "EXPIRED" : "VALID") + '</span></div>' +
+      '<h4>' + esc(counter.name) + '</h4>' +
+      '<div class="meta">bought ' + when(Number(v.boughtAt)) + ' · ' +
+        (expired ? "expired " + when(Number(v.expiresAt)) : human(Number(v.expiresAt) - now) + " left") + '</div>' +
+      (v.memo ? '<div class="meta">“' + esc(v.memo) + '”</div>' : '') +
+      '<div class="face">' + fmt(v.value) + ' BOT</div>' +
+      '<div class="acts">' +
+        (!expired ? '<button class="leafy sm" data-redeem="' + id + '">Spend it</button>' : '') +
+        (!expired ? '<button class="ghost sm" data-transfer="' + id + '">Pass on</button>' : '') +
+        (expired ? '<button class="sm" data-refund="' + id + '">Reclaim</button>' : '') +
+      '</div>' +
+    '</article>';
+  }).join("");
+}
+
+/* --------------------------------------------------------------- actions */
+async function send(label, fn) {
+  if (!contract) { toast("Connect a wallet first.", true); return; }
+  try {
+    toast(label + "…");
+    const tx = await fn();
+    await tx.wait();
+    toast(label + " confirmed");
+    await load();
+  } catch (e) { toast(reason(e), true); }
+}
+
+$("btn-open-counter").onclick = () => {
+  const name = $("f-name").value.trim();
+  const denom = $("f-denom").value;
+  if (!name) { toast("Give the counter a name.", true); return; }
+  if (!(Number(denom) >= 0.001)) { toast("Face value must be at least 0.001 BOT.", true); return; }
+  send("Opening counter", () => contract.openCounter(name, ethers.parseEther(denom), $("f-validity").value));
+};
+
+$("shelf").addEventListener("click", (ev) => {
+  const buy = ev.target.closest("button[data-buy]");
+  if (buy) {
+    const memo = prompt("Add a short note to the voucher (optional)", "") || "";
+    return send("Buying voucher", () => contract.buyVoucher(buy.dataset.buy, memo.slice(0, 64), { value: buy.dataset.price }));
+  }
+  const sell = ev.target.closest("button[data-sell]");
+  if (sell) return send("Updating counter", () => contract.setSelling(sell.dataset.sell, sell.dataset.to === "1"));
+});
+
+$("wallet").addEventListener("click", (ev) => {
+  const r = ev.target.closest("button[data-redeem]");
+  if (r) return send("Spending voucher", () => contract.redeemVoucher(r.dataset.redeem));
+  const f = ev.target.closest("button[data-refund]");
+  if (f) return send("Reclaiming", () => contract.refundExpired(f.dataset.refund));
+  const t = ev.target.closest("button[data-transfer]");
+  if (t) {
+    const to = prompt("Send this voucher to which address?", "");
+    if (!to) return;
+    if (!ethers.isAddress(to)) { toast("That is not a valid address.", true); return; }
+    return send("Passing voucher on", () => contract.transferVoucher(t.dataset.transfer, to));
+  }
+});
+
+$("btn-connect").onclick = connect;
+$("btn-refresh").onclick = load;
+
+/* ------------------------------------------------------------------ boot */
+$("p-net").textContent = NETWORK.chainName + " · " + NETWORK.label;
+$("f-chain").textContent = "TonicTab · BOT Chain " + NETWORK.label;
+if (CONTRACT_ADDRESS !== ZERO) {
+  $("p-ctr").textContent = short(CONTRACT_ADDRESS);
+} else {
+  $("p-ctr").textContent = "contract not set";
+  $("p-ctr").className = "pill warn";
+}
+if (window.ethereum) {
+  window.ethereum.on("accountsChanged", () => location.reload());
+  window.ethereum.on("chainChanged", () => location.reload());
+}
+readOnly();
+load();
+
+/* ---- BOT Chain ecosystem footer: follows the NETWORK config above ---- */
+(function () {
+  var ex = document.getElementById("bc-explorer");
+  if (ex) ex.href = NETWORK.blockExplorerUrls[0];
+})();
+</script>
+</body>
+</html>
